@@ -5,7 +5,12 @@ import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothManager;
 import android.content.Context;
+import android.hardware.Sensor;
+import android.hardware.SensorEvent;
+import android.hardware.SensorEventListener;
+import android.hardware.SensorManager;
 import android.os.Environment;
+import android.os.Handler;
 import android.support.v7.app.ActionBarActivity;
 import android.os.Bundle;
 import android.util.Log;
@@ -22,19 +27,27 @@ import java.io.IOException;
 import java.util.Calendar;
 
 
-public class MainActivity extends Activity {
+public class MainActivity extends Activity implements SensorEventListener {
 
-    private static final long SCAN_PERIOD = 1000;
+    private static final long SCAN_PERIOD = 1200;
 
     boolean running;
     MeasureStrategy measureStrategy;
+
+    float rotation;
+    SensorManager sensorManager;
+    Sensor accelerometer;
+    Sensor magnetometer;
+
     File file;
     FileOutputStream outputStream;
 
     BluetoothAdapter bluetoothAdapter;
+    Handler handler;
 
     Button startButton;
     TextView rssiTextView;
+    TextView rotationTextView;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -42,14 +55,20 @@ public class MainActivity extends Activity {
         setContentView(R.layout.activity_main);
 
         running = false;
-        measureStrategy = new SimpleMeasure(this);
+        measureStrategy = new FullMagnetMeasure(this);
+
+        sensorManager = (SensorManager) getSystemService(SENSOR_SERVICE);
+        accelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
+        magnetometer = sensorManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD);
 
         final BluetoothManager bluetoothManager =
                 (BluetoothManager) getSystemService(Context.BLUETOOTH_SERVICE);
         bluetoothAdapter = bluetoothManager.getAdapter();
+        handler = new Handler();
 
         startButton = (Button) findViewById(R.id.start_button);
         rssiTextView = (TextView) findViewById(R.id.rssi_text_view);
+        rotationTextView = (TextView) findViewById(R.id.rotation_text_view);
     }
 
     @Override
@@ -75,11 +94,22 @@ public class MainActivity extends Activity {
     }
 
     @Override
+    protected void onStart() {
+        super.onStart();
+
+        sensorManager.registerListener(this, accelerometer, SensorManager.SENSOR_DELAY_NORMAL);
+        sensorManager.registerListener(this, magnetometer, SensorManager.SENSOR_DELAY_NORMAL);
+    }
+
+    @Override
     protected void onStop() {
         super.onStop();
 
+        sensorManager.unregisterListener(this);
+
         if (bluetoothAdapter != null) {
             bluetoothAdapter.stopLeScan(leScanCallback);
+            handler.removeCallbacks(handlerAction);
         }
         if (outputStream != null) {
             try {
@@ -111,14 +141,16 @@ public class MainActivity extends Activity {
             } catch (Exception e) {
                 e.printStackTrace();
             }
-            Log.d("", "writing to: "+file.getAbsolutePath());
+            Log.d("", "writing to: " + file.getAbsolutePath());
 
             bluetoothAdapter.startLeScan(leScanCallback);
+            handler.postDelayed(handlerAction, SCAN_PERIOD);
 
             running = true;
             startButton.setText("Stop");
         } else {
             bluetoothAdapter.stopLeScan(leScanCallback);
+            handler.removeCallbacks(handlerAction);
 
             try {
                 outputStream.close();
@@ -135,7 +167,7 @@ public class MainActivity extends Activity {
     private String buildFileName() {
         Calendar calendar = Calendar.getInstance();
         int year = calendar.get(Calendar.YEAR);
-        int month = calendar.get(Calendar.MONTH);
+        int month = calendar.get(Calendar.MONTH) + 1;
         int day = calendar.get(Calendar.DAY_OF_MONTH);
         int hour = calendar.get(Calendar.HOUR);
         int minute = calendar.get(Calendar.MINUTE);
@@ -157,7 +189,12 @@ public class MainActivity extends Activity {
                 @Override
                 public void onLeScan(final BluetoothDevice device, int rssi,
                                      byte[] scanRecord) {
-                    //TODO check for correct device
+                    final int rssi2 = rssi;
+
+                    //check for correct device
+                    if (!device.getAddress().equals("00:07:80:1B:5C:7C")) {
+                        return;
+                    }
 
                     String line = measureStrategy.getLine(rssi) + "\n";
 
@@ -167,7 +204,49 @@ public class MainActivity extends Activity {
                         e.printStackTrace();
                     }
 
-                    rssiTextView.setText(""+rssi);
+                    runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            rssiTextView.setText("" + rssi2);
+                        }
+                    });
+
                 }
             };
+
+    private Runnable handlerAction = new Runnable() {
+        @Override
+        public void run() {
+            bluetoothAdapter.stopLeScan(leScanCallback);
+            bluetoothAdapter.startLeScan(leScanCallback);
+            handler.postDelayed(handlerAction, SCAN_PERIOD);
+        }
+    };
+
+    float[] mGravity;
+    float[] mGeomagnetic;
+
+    @Override
+    public void onSensorChanged(SensorEvent event) {
+        if (event.sensor.getType() == Sensor.TYPE_ACCELEROMETER)
+            mGravity = event.values;
+        if (event.sensor.getType() == Sensor.TYPE_MAGNETIC_FIELD)
+            mGeomagnetic = event.values;
+        if (mGravity != null && mGeomagnetic != null) {
+            float R[] = new float[9];
+            float I[] = new float[9];
+            boolean success = SensorManager.getRotationMatrix(R, I, mGravity, mGeomagnetic);
+            if (success) {
+                float orientation[] = new float[3];
+                SensorManager.getOrientation(R, orientation);
+                rotation = orientation[0]; // orientation contains: azimut, pitch and roll
+                rotationTextView.setText(rotation + "");
+            }
+        }
+    }
+
+    @Override
+    public void onAccuracyChanged(Sensor sensor, int accuracy) {
+
+    }
 }

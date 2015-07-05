@@ -7,6 +7,8 @@ import android.content.Context;
  */
 public abstract class MeasureStrategy {
 
+    public static final String separator = ";";
+
     Context context;
     String[] columnNames;
     //description
@@ -22,7 +24,7 @@ public abstract class MeasureStrategy {
         String res = "";
         for (int i = 0; i < columnNames.length; i++) {
             res += columnNames[i];
-            res += ";";
+            res += separator;
         }
         return res +"\n";
     }
