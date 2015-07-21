@@ -9,14 +9,14 @@ import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
+import android.os.Bundle;
 import android.os.Environment;
 import android.os.Handler;
-import android.support.v7.app.ActionBarActivity;
-import android.os.Bundle;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
+import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -30,6 +30,10 @@ import java.util.Calendar;
 public class MainActivity extends Activity implements SensorEventListener {
 
     private static final long SCAN_PERIOD = 1200;
+
+    public static final String mac1 = "00:07:80:78:F5:88";
+    public static final String mac2 = "00:07:80:78:FA:5A";
+    public static final String mac3 = "00:07:80:1B:5C:7C";
 
     boolean running;
     MeasureStrategy measureStrategy;
@@ -48,14 +52,18 @@ public class MainActivity extends Activity implements SensorEventListener {
     Button startButton;
     TextView rssiTextView;
     TextView rotationTextView;
+    TextView resultTextView;
+    TextView timeTextView;
+
+    long startTime;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+        getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
 
         running = false;
-        measureStrategy = new FullMagnetMeasure(this);
 
         sensorManager = (SensorManager) getSystemService(SENSOR_SERVICE);
         accelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
@@ -69,6 +77,7 @@ public class MainActivity extends Activity implements SensorEventListener {
         startButton = (Button) findViewById(R.id.start_button);
         rssiTextView = (TextView) findViewById(R.id.rssi_text_view);
         rotationTextView = (TextView) findViewById(R.id.rotation_text_view);
+        resultTextView = (TextView) findViewById(R.id.result_text_view);
     }
 
     @Override
@@ -127,6 +136,10 @@ public class MainActivity extends Activity implements SensorEventListener {
                 return;
             }
 
+            //TODO
+            //make new strategy instance, just in case
+            measureStrategy = new MultiMagnetMeasure(this);
+
             File dir = new File(Environment.getExternalStoragePublicDirectory(
                     Environment.DIRECTORY_DOCUMENTS).getPath() + "/Measure/");
             if (!dir.exists()) {
@@ -148,11 +161,14 @@ public class MainActivity extends Activity implements SensorEventListener {
 
             running = true;
             startButton.setText("Stop");
+            resultTextView.setText("none");
         } else {
             bluetoothAdapter.stopLeScan(leScanCallback);
             handler.removeCallbacks(handlerAction);
 
             try {
+                //write final lines
+                outputStream.write(measureStrategy.getLines().getBytes());
                 outputStream.close();
             } catch (Exception e) {
                 e.printStackTrace();
@@ -161,6 +177,9 @@ public class MainActivity extends Activity implements SensorEventListener {
             running = false;
             startButton.setText("Start");
             rssiTextView.setText("none");
+
+            //show result
+            resultTextView.setText(measureStrategy.getResult() + "");
         }
     }
 
@@ -192,14 +211,22 @@ public class MainActivity extends Activity implements SensorEventListener {
                     final int rssi2 = rssi;
 
                     //check for correct device
-                    if (!device.getAddress().equals("00:07:80:1B:5C:7C")) {
+                    if (!device.getAddress().equals(mac1) && !device.getAddress().equals(mac2) && !device.getAddress().equals(mac3)) {
                         return;
                     }
 
-                    String line = measureStrategy.getLine(rssi) + "\n";
+                    String line = measureStrategy.getLine(rssi);
+                    if (!line.equals("")) {
+                        line += "\n";
+                    }
+                    String line2 = measureStrategy.getLine(device.getAddress(), rssi);
+                    if (!line2.equals("")) {
+                        line2 += "\n";
+                    }
 
                     try {
                         outputStream.write(line.getBytes());
+                        outputStream.write(line2.getBytes());
                     } catch (Exception e) {
                         e.printStackTrace();
                     }

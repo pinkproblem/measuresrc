@@ -20,6 +20,20 @@ public abstract class MeasureStrategy {
 
     public abstract String getLine(int rssi);
 
+    public String getLine(String address, int rssi) {
+        return "";
+    }
+
+    //called on file close; for final calculation stuff
+    public String getLines() {
+        return "";
+    }
+
+    //if the strategy can do some kind of evaluation
+    public double getResult() {
+        return 0;
+    }
+
     public String getHeaderLine() {
         String res = "";
         for (int i = 0; i < columnNames.length; i++) {
