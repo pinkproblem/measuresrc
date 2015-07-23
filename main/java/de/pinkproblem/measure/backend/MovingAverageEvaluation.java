@@ -11,11 +11,44 @@ public class MovingAverageEvaluation implements EvaluationStrategy {
 
     /*decides how many values should be averaged each time, e.g. 0.5 means with 20 values that
     each smoothed point averages 10 original points.*/
-    private static final double rangeFactor = 0.3;
+    private final double rangeFactor;
     private CircularArrayList<Sample> samples;
+    private Comparator<AvgSample> compAzimuth;
+    private Comparator<AvgSample> compRssi;
 
     public MovingAverageEvaluation() {
+        this(0.3);
+    }
+
+    public MovingAverageEvaluation(double rangeFactor) {
+        this.rangeFactor = rangeFactor;
+
         this.samples = new CircularArrayList<>();
+
+        compAzimuth = new Comparator<AvgSample>() {
+            @Override
+            public int compare(AvgSample lhs, AvgSample rhs) {
+                if (lhs.azimuth < rhs.azimuth) {
+                    return -1;
+                } else if (lhs.azimuth > rhs.azimuth) {
+                    return 1;
+                } else {
+                    return 0;
+                }
+            }
+        };
+        compRssi = new Comparator<AvgSample>() {
+            @Override
+            public int compare(AvgSample lhs, AvgSample rhs) {
+                if (lhs.avgRssi < rhs.avgRssi) {
+                    return -1;
+                } else if (lhs.avgRssi > rhs.avgRssi) {
+                    return 1;
+                } else {
+                    return 0;
+                }
+            }
+        };
     }
 
     @Override
@@ -48,8 +81,13 @@ public class MovingAverageEvaluation implements EvaluationStrategy {
         ArrayList<AvgSample> smoothValues = new ArrayList<>();
         //calculate range
         int range = (int) Math.floor(samples.size() * rangeFactor);
+        if (range == 0) {
+            //avoids division by 0
+            range = 1;
+        }
+
         for (int i = 0; i < samples.size(); i++) {
-            int sum = 0;
+            double sum = 0;
             for (int j = i - range / 2; j < i - range / 2 + range; j++) {
                 sum += samples.get(j).getRssi();
             }
@@ -61,27 +99,23 @@ public class MovingAverageEvaluation implements EvaluationStrategy {
         //get median of first x maximums
         ArrayList<AvgSample> maximums = new ArrayList<>();
         //get first x maximums
-        for (int i = 0; i < samples.size() * rangeFactor; i++) {
-            AvgSample max = Collections.max(smoothValues, new Comparator<AvgSample>() {
-                @Override
-                public int compare(AvgSample lhs, AvgSample rhs) {
-                    if (lhs.avgRssi < rhs.avgRssi) {
-                        return -1;
-                    } else if (lhs.avgRssi > rhs.avgRssi) {
-                        return 1;
-                    } else {
-                        return 0;
-                    }
-                }
-            });
+        for (int i = 0; i < range; i++) {
+            AvgSample max = Collections.max(smoothValues, compRssi);
             maximums.add(max);
             smoothValues.remove(max);
         }
         //get median
-        //is already sorted, because the maximums were inserted in descending order
-        AvgSample median = maximums.get(maximums.size() / 2);
+        //sort again
+        Collections.sort(maximums, compAzimuth);
+        double median;
+        if (maximums.size() % 2 == 0) {
+            median = (maximums.get(maximums.size() / 2).azimuth + maximums.get(maximums.size() / 2 + 1)
+                    .azimuth) / 2;
+        } else {
+            median = maximums.get(maximums.size() / 2).azimuth;
+        }
 
-        return median.azimuth;
+        return median;
     }
 
     class AvgSample {
