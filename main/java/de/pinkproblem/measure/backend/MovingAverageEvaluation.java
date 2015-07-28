@@ -109,7 +109,8 @@ public class MovingAverageEvaluation implements EvaluationStrategy {
         Collections.sort(maximums, compAzimuth);
         double median;
         if (maximums.size() % 2 == 0) {
-            median = (maximums.get(maximums.size() / 2).azimuth + maximums.get(maximums.size() / 2 + 1)
+            median = (maximums.get(maximums.size() / 2 - 1).azimuth + maximums.get(maximums.size() /
+                    2)
                     .azimuth) / 2;
         } else {
             median = maximums.get(maximums.size() / 2).azimuth;

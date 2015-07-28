@@ -83,10 +83,8 @@ public class DiscreteEvaluationWithMin implements EvaluationStrategy {
         double minAzimuthOp = getOpposing(minAzimuth);
         //averaging over the border of pi/minus pi:
         if (maxAzimuth - minAzimuthOp > Math.PI) {
-            //project to opposite, average and project back
-            double oppositeMax = getOpposing(maxAzimuth);
-            double oppositeMin = getOpposing(minAzimuthOp);
-            double oppositeAvg = getOpposing((oppositeMax + oppositeMin) / 2);
+            //average and project to opposite
+            double oppositeAvg = getOpposing((maxAzimuth + minAzimuthOp) / 2);
 
             return getOpposing(oppositeAvg);
         }

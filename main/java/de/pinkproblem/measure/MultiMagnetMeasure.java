@@ -27,6 +27,10 @@ public class MultiMagnetMeasure extends MeasureStrategy {
     MovingAverageEvaluation avgEv2;
     MovingAverageEvaluation avgEv3;
 
+    MovingAverageEvaluation avgEv051;
+    MovingAverageEvaluation avgEv052;
+    MovingAverageEvaluation avgEv053;
+
     public MultiMagnetMeasure(MainActivity m) {
         super(m);
         main = m;
@@ -42,6 +46,10 @@ public class MultiMagnetMeasure extends MeasureStrategy {
         avgEv1 = new MovingAverageEvaluation();
         avgEv2 = new MovingAverageEvaluation();
         avgEv3 = new MovingAverageEvaluation();
+
+        avgEv051 = new MovingAverageEvaluation(0.5);
+        avgEv052 = new MovingAverageEvaluation(0.5);
+        avgEv053 = new MovingAverageEvaluation(0.5);
 
         columnNames = new String[]{"Azimuth", mac1, mac2, mac3};
         strategyTag = "multi_magnet";
@@ -59,16 +67,19 @@ public class MultiMagnetMeasure extends MeasureStrategy {
             discEv1.addSample(rotation, rssi, 0);
             discMinEv1.addSample(rotation, rssi, 0);
             avgEv1.addSample(rotation, rssi, 0);
+            avgEv051.addSample(rotation, rssi, 0);
             return rotation + separator + rssi;
         } else if (address.equals(mac2)) {
             discEv2.addSample(rotation, rssi, 0);
             discMinEv2.addSample(rotation, rssi, 0);
             avgEv2.addSample(rotation, rssi, 0);
+            avgEv052.addSample(rotation, rssi, 0);
             return rotation + separator + separator + rssi;
         } else if (address.equals(mac3)) {
             discEv3.addSample(rotation, rssi, 0);
             discMinEv3.addSample(rotation, rssi, 0);
             avgEv3.addSample(rotation, rssi, 0);
+            avgEv053.addSample(rotation, rssi, 0);
             return rotation + separator + separator + separator + rssi;
         }
         throw new IllegalStateException("None of the expected mac addresses");
@@ -83,6 +94,8 @@ public class MultiMagnetMeasure extends MeasureStrategy {
                 .calculate() + separator + discMinEv3.calculate();
         res += "\n" + "MovAvgEv0.3" + separator + avgEv1.calculate() + separator + avgEv2.calculate()
                 + separator + avgEv3.calculate();
+        res += "\n" + "MovAvgEv0.5" + separator + avgEv051.calculate()
+                + separator + avgEv052.calculate() + separator + avgEv053.calculate();
         return res;
     }
 }
